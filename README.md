@@ -1,0 +1,94 @@
+# MTA info API
+
+## Concepts
+
+### Device
+
+Each device has an identifier presented at enrollment and when requesting the current MTA status.
+
+The last request timestamp is stored with the device row.
+
+It also references one or more configurations.
+
+### Configuration
+
+A configuration includes the following properties:
+
+ - origin station
+ - MTA service letter/number
+ - direction (uptown/downtown)
+ - (optional) destination station, destination walk time (min)
+
+## Interactions
+
+The web UI is only accessible on LAN and VPN and no user authentication / multi-tenancy infrastructure is required.
+
+### List devices
+
+A list of devices linking to the configuration page for each, the 'view dashboard' preview for each, and a button to enroll a new device.
+
+### Enroll new device
+
+User takes identifier reported by device and enters into a web form.
+
+New row is stored for this device.
+
+A default configuration row is populated and pointed at the device identifier.
+
+### Configure device
+
+All configurations that are used by this device through a join table are shown for editing in-page.
+
+Only one configuration per service is allowed, i.e. `(device_id, service)` must be unique together.
+
+Include a link to preview the dashboard in-browser.
+
+### View dashboard
+
+For a given device, show the next `max_departures` (query parameter, default = 3) departures in a format (two rows, index, service, terminus, minutes-to-arrive) inspired by MTA departures boards. Update with polling, as embedded clients would. With `debug=1`, additionally pretty-print the raw JSON the API returned below the board.
+
+## API
+
+The device is responsible for formatting/presentation. To show the next `max_departures` (query parameter, default = 3) departures, it needs the following information for each:
+
+```json
+{
+  "service": "N",
+  "terminus": "Coney Island–Stillwell Av",
+  "arrives_at": "2026-09-13T17:08Z",
+  "stops_at_destination": true,
+  "reach_destination_at": "2026-09-13T17:42Z"
+}
+```
+
+ - `service` - string - MTA service code as used by the GTFS data, e.g. `"6X"` for "6 express"
+ - `terminus` - string - final destination of the train
+ - `arrives_at` - ISO 8601 timestamp string - time of arrival at the configured origin station
+ - `stops_at_destination` - boolean, optional - when a destination station is configured, this key is present and indicates whether the scheduled train is making its usual stop at that station (only trains heading in the configured direction are ever listed, so `false` really means the train skips the destination)
+ - `reach_destination_at` - ISO 8601 timestamp string, optional - when a destination station is configured and `stops_at_destination` is `true`, this is the time to arrive at the destination (including any walk time after reaching the station)
+
+The device identifies itself with an `X-Device-ID` header in its request. The resulting list of departures is the union of matching departures for all the configurations.
+
+When a device polls the API, the last request timestamp in its row is updated.
+
+## Running
+
+```sh
+uv sync --extra dev
+uv run mta-info-api            # serves http://0.0.0.0:8000 (override with --host/--port)
+```
+
+State (SQLite database + cached static GTFS data) lives in `./var`; override with
+`MTA_STATE_DIR`. On first run the static GTFS data is fetched from the MTA in the
+background so the configure page has stations to pick from.
+
+The web UI is at `/`: enroll a device, configure it at `/devices/<id>/configure`,
+and preview its board at `/devices/<id>/dashboard`. Devices poll
+`GET /api/departures?max_departures=N` with their `X-Device-ID` header.
+
+## Development
+
+```sh
+uv run pytest                  # unit tests (src/mta_info/tests)
+uv run pytest tests_e2e        # browser e2e tests (Playwright, Firefox)
+```

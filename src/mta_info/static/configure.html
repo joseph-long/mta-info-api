@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Configure device — MTA Departures</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <div class="ui-page">
+      <h1>Configure device <span id="device-id-label"></span></h1>
+      <div class="nav-row">
+        <a href="/">&larr; Devices</a>
+        <a id="dashboard-link" href="#">View dashboard &rarr;</a>
+        <span id="last-request" class="muted"></span>
+      </div>
+
+      <div id="stations-banner" class="banner" hidden>
+        Station data is not loaded yet, so stations can't be picked.
+        <button id="refresh-gtfs" class="secondary" type="button">Fetch station data from MTA</button>
+        <span id="refresh-status" class="status-text"></span>
+      </div>
+
+      <h2>Configurations</h2>
+      <p class="muted">
+        One configuration per service: each entry shows the next arrivals of one
+        service at the origin station in the chosen direction. A destination adds
+        per-train arrival info, including the walk from the destination platform.
+      </p>
+      <div id="config-rows"></div>
+
+      <div class="actions-row">
+        <button id="add-config" class="secondary" type="button">+ Add configuration</button>
+        <button id="save-config" type="button">Save configurations</button>
+        <span id="save-status" class="status-text"></span>
+      </div>
+    </div>
+    <script type="module" src="/static/js/configure.js"></script>
+  </body>
+</html>

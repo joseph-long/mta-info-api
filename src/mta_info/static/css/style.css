@@ -1,0 +1,379 @@
+:root {
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  font-family: Helvetica, Arial, sans-serif;
+  background: #000;
+  color: #fff;
+}
+
+a {
+  color: #7aa2f7;
+}
+
+/* ---------- Departures board (dashboard page) ---------- */
+
+.board-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  width: 100%;
+  background: #000;
+}
+
+#app {
+  width: 100%;
+}
+
+.departures-board {
+  width: 100%;
+  background: #000;
+  border: 2px solid #222;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  /* Lets descendants size themselves in cqw (relative to the board's width)
+     instead of vw, so the board can be embedded inside other displays. */
+  container-type: inline-size;
+}
+
+.departure-row {
+  height: 9cqw;
+  display: flex;
+  align-items: center;
+  gap: 2.5cqw;
+  padding: 0 3cqw;
+  border-bottom: 1px solid #1a1a1a;
+  font-size: 6cqw;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.departure-row:last-child {
+  border-bottom: none;
+}
+
+.departure-row.empty {
+  color: #444;
+  font-size: 3cqw;
+}
+
+.row-index {
+  flex: 0 0 auto;
+  min-width: 4cqw;
+  color: #666;
+  font-variant-numeric: tabular-nums;
+}
+
+.service-bullet {
+  flex: 0 0 auto;
+  width: 5.5cqw;
+  height: 5.5cqw;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  overflow: hidden;
+}
+
+.service-bullet.is-diamond {
+  /* Express services (6X, 7X, FX) get the MTA diamond: a rotated square,
+     shrunk so its footprint (diagonal = side * sqrt(2)) matches the circle's.
+     The label is counter-rotated so its text stays upright. */
+  width: 4.3cqw;
+  height: 4.3cqw;
+  border-radius: 0;
+  transform: rotate(45deg);
+}
+
+.service-bullet.is-diamond .service-bullet-label {
+  transform: rotate(-45deg);
+}
+
+.service-bullet-label {
+  /* inline-block (rather than the default inline) changes how its box
+     height is derived from line-height, which -- empirically, verified by
+     measuring actual glyph ink against the circle's true center -- centers
+     digit/cap glyphs correctly on its own despite their asymmetric
+     ascent/descent. A plain inline text run does not center correctly here. */
+  display: inline-block;
+  font-size: 3.5cqw;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.service-bullet-label.is-wide {
+  /* Multi-character short names (e.g. Staten Island Railway's "SIR") need a
+     smaller size plus tighter tracking to fit the bullet. */
+  font-size: 2.8cqw;
+  letter-spacing: -0.05em;
+}
+
+.terminus {
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 1em;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.destination-warning {
+  flex: 0 0 auto;
+  font-size: 4cqw;
+  line-height: 1;
+  cursor: help;
+}
+
+.minutes {
+  /* Fixed-width slot sized for the worst case ("88min") so the terminus
+     text's ellipsis point doesn't shift depending on the digit count. */
+  flex: 0 0 auto;
+  min-width: 12cqw;
+  text-align: right;
+  color: #ffd400;
+  font-variant-numeric: tabular-nums;
+}
+
+.minutes-unit {
+  font-size: 0.4em;
+  margin-left: 0.3em;
+  color: #aaa;
+}
+
+.debug-json {
+  margin: 1rem;
+  padding: 1rem;
+  background: #0b0b0d;
+  border: 1px solid #2a2a2e;
+  border-radius: 6px;
+  color: #9aa;
+  font-family: ui-monospace, Menlo, monospace;
+  font-size: 0.85rem;
+  overflow-x: auto;
+}
+
+/* ---------- Shared UI (devices list + configure page) ---------- */
+
+.ui-page {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 4rem;
+  background: #0b0b0d;
+  min-height: 100vh;
+}
+
+.ui-page h1 {
+  font-size: 1.4rem;
+  margin-bottom: 0.25rem;
+}
+
+.ui-page h2 {
+  font-size: 1rem;
+  letter-spacing: 0.05em;
+  color: #9aa;
+  border-bottom: 1px solid #2a2a2e;
+  padding-bottom: 0.4rem;
+  margin-top: 2.2rem;
+}
+
+.nav-row {
+  display: flex;
+  gap: 1.25rem;
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+}
+
+.muted {
+  color: #9aa;
+  font-size: 0.85rem;
+}
+
+.card {
+  background: #15151a;
+  border: 1px solid #2a2a2e;
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-top: 1rem;
+}
+
+table.devices {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 1rem;
+}
+
+table.devices th,
+table.devices td {
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid #2a2a2e;
+  font-size: 0.95rem;
+}
+
+table.devices th {
+  color: #9aa;
+  font-weight: 600;
+}
+
+.field-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 160px;
+}
+
+.field label {
+  font-size: 0.8rem;
+  color: #9aa;
+}
+
+.field input[type="text"],
+.field input[type="number"],
+.field select {
+  background: #0b0b0d;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 0.5rem 0.6rem;
+  border-radius: 6px;
+  font-family: inherit;
+  font-size: 0.95rem;
+}
+
+button {
+  background: #1d4ed8;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 0.55rem 1.1rem;
+  font-size: 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  background: #2952e0;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+button.secondary {
+  background: #2a2a2e;
+}
+
+button.secondary:hover {
+  background: #35353b;
+}
+
+.status-text {
+  margin-left: 0.75rem;
+  font-size: 0.85rem;
+  color: #9aa;
+}
+
+.status-text.ok {
+  color: #4ade80;
+}
+
+.status-text.error {
+  color: #f87171;
+}
+
+.actions-row {
+  display: flex;
+  align-items: center;
+  margin-top: 1rem;
+  gap: 0.5rem;
+}
+
+.config-row {
+  padding: 1rem 0;
+  border-bottom: 1px solid #2a2a2e;
+}
+
+.config-row:last-of-type {
+  border-bottom: none;
+}
+
+.config-row-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+
+.config-row-header h3 {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #9aa;
+}
+
+.station-picker {
+  position: relative;
+}
+
+.station-picker input {
+  width: 100%;
+  min-width: 260px;
+}
+
+.station-picker-list {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 260px;
+  overflow-y: auto;
+  background: #1a1a1f;
+  border: 1px solid #333;
+  border-radius: 6px;
+  list-style: none;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.station-picker-list li {
+  padding: 0.45rem 0.7rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.station-picker-list li:hover {
+  background: #2952e0;
+}
+
+.banner {
+  background: #3b2f0b;
+  border: 1px solid #8a6d1d;
+  color: #ffd400;
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin-top: 1rem;
+  font-size: 0.9rem;
+}

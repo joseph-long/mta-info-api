@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MTA Departures — Devices</title>
+    <link rel="stylesheet" href="/static/css/style.css" />
+  </head>
+  <body>
+    <div class="ui-page">
+      <h1>Devices</h1>
+
+      <form id="enroll-form" class="card">
+        <div class="field-row">
+          <div class="field">
+            <label for="device-id">Device identifier (reported by the device)</label>
+            <input type="text" id="device-id" required maxlength="200" autocomplete="off" />
+          </div>
+        </div>
+        <div class="actions-row">
+          <button type="submit">Enroll new device</button>
+          <span id="enroll-status" class="status-text"></span>
+        </div>
+      </form>
+
+      <h2>Enrolled devices</h2>
+      <table class="devices">
+        <thead>
+          <tr>
+            <th>Device</th>
+            <th>Last request</th>
+            <th></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="devices-body"></tbody>
+      </table>
+      <p id="no-devices" class="muted" hidden>No devices enrolled yet.</p>
+    </div>
+    <script type="module" src="/static/js/index.js"></script>
+  </body>
+</html>
