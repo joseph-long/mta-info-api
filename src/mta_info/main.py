@@ -17,6 +17,7 @@ from .db import (
     Database,
     DeviceExistsError,
     DuplicateServiceError,
+    ScheduleUpdate,
 )
 from .departures import compute_departures, merge_departures
 from .feeds import FeedCache, feed_groups_for_routes
@@ -43,6 +44,19 @@ class ConfigurationPayload(BaseModel):
 
 class ConfigurationsPayload(BaseModel):
     configurations: list[ConfigurationPayload]
+
+
+class SchedulePayload(BaseModel):
+    """A device's commute/dim/off windows -- self-luminous displays only, see
+    README. All fields optional; omitted/null disables that window."""
+
+    commute_start: str | None = None
+    commute_end: str | None = None
+    dim_start: str | None = None
+    dim_end: str | None = None
+    dim_brightness: int | None = Field(default=None, ge=0, le=255)
+    off_start: str | None = None
+    off_end: str | None = None
 
 
 async def _fetch_static_gtfs_if_missing(app: FastAPI) -> None:
@@ -141,6 +155,17 @@ def create_app(feed_cache: FeedCache | None = None) -> FastAPI:
             )
         return [asdict(c) for c in configs]
 
+    @app.put("/api/devices/{device_id}/schedule")
+    async def put_schedule(request: Request, device_id: str, payload: SchedulePayload):
+        db: Database = request.app.state.db
+        if db.get_device(device_id) is None:
+            raise HTTPException(404, f"unknown device: {device_id}")
+        try:
+            device = db.update_schedule(device_id, ScheduleUpdate(**payload.model_dump()))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc))
+        return asdict(device)
+
     # -- stations / GTFS ---------------------------------------------------
 
     @app.get("/api/stations")
@@ -185,6 +210,26 @@ def create_app(feed_cache: FeedCache | None = None) -> FastAPI:
         messages = await request.app.state.feed_cache.messages_for(groups)
         by_config = [compute_departures(messages, c, index) for c in configs]
         return [d.to_dict() for d in merge_departures(by_config, max_departures)]
+
+    @app.get("/api/schedule")
+    async def api_schedule(request: Request):
+        device_id = request.headers.get("X-Device-ID", "").strip()
+        if not device_id:
+            raise HTTPException(401, "missing X-Device-ID header")
+        db: Database = request.app.state.db
+        device = db.get_device(device_id)
+        if device is None:
+            raise HTTPException(404, f"unknown device: {device_id}")
+        db.touch_device(device_id)
+        return {
+            "commute_start": device.commute_start,
+            "commute_end": device.commute_end,
+            "dim_start": device.dim_start,
+            "dim_end": device.dim_end,
+            "dim_brightness": device.dim_brightness,
+            "off_start": device.off_start,
+            "off_end": device.off_end,
+        }
 
     return app
 

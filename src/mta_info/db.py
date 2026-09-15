@@ -1,3 +1,4 @@
+import re
 import sqlite3
 from contextlib import contextmanager
 from dataclasses import dataclass
@@ -8,7 +9,14 @@ SCHEMA = """
 CREATE TABLE IF NOT EXISTS devices (
     id TEXT PRIMARY KEY,
     created_at TEXT NOT NULL,
-    last_request_at TEXT
+    last_request_at TEXT,
+    commute_start TEXT,
+    commute_end TEXT,
+    dim_start TEXT,
+    dim_end TEXT,
+    dim_brightness INTEGER,
+    off_start TEXT,
+    off_end TEXT
 );
 CREATE TABLE IF NOT EXISTS configurations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,6 +52,19 @@ def normalize_direction(direction: str) -> str:
     return normalized
 
 
+_HHMM_RE = re.compile(r"^([0-1]\d|2[0-3]):([0-5]\d)$")
+
+
+def validate_hhmm(value: str) -> str:
+    """"HH:MM", 24-hour, zero-padded -- the device's own schedule windows are
+    always evaluated in America/New_York (DASHBOARD_TZ on the firmware side),
+    so there's no separate timezone field to carry here."""
+    value = value.strip()
+    if not _HHMM_RE.match(value):
+        raise ValueError(f"invalid time (expected 24h \"HH:MM\"): {value!r}")
+    return value
+
+
 class DeviceExistsError(Exception):
     pass
 
@@ -61,6 +82,30 @@ class Device:
     id: str
     created_at: str
     last_request_at: str | None
+    commute_start: str | None = None
+    commute_end: str | None = None
+    dim_start: str | None = None
+    dim_end: str | None = None
+    dim_brightness: int | None = None
+    off_start: str | None = None
+    off_end: str | None = None
+
+
+@dataclass
+class ScheduleUpdate:
+    """Fields of a device's display schedule as submitted for saving. Every
+    field is optional; empty/None means that window is disabled. Self-luminous
+    displays (the waveshare-rgb-matrix firmware) evaluate these locally against
+    their own NTP clock -- ePaper devices never call the schedule endpoint at
+    all."""
+
+    commute_start: str | None = None
+    commute_end: str | None = None
+    dim_start: str | None = None
+    dim_end: str | None = None
+    dim_brightness: int | None = None
+    off_start: str | None = None
+    off_end: str | None = None
 
 
 @dataclass
@@ -154,6 +199,37 @@ class Database:
                 "UPDATE devices SET last_request_at = ? WHERE id = ?",
                 (_now_iso(), device_id),
             )
+
+    def update_schedule(self, device_id: str, update: ScheduleUpdate) -> Device:
+        """Validate and save a device's whole display schedule (commute/dim/off
+        windows are replaced wholesale, same save-the-whole-thing shape as
+        replace_configurations)."""
+        commute_start = validate_hhmm(update.commute_start) if update.commute_start else None
+        commute_end = validate_hhmm(update.commute_end) if update.commute_end else None
+        dim_start = validate_hhmm(update.dim_start) if update.dim_start else None
+        dim_end = validate_hhmm(update.dim_end) if update.dim_end else None
+        off_start = validate_hhmm(update.off_start) if update.off_start else None
+        off_end = validate_hhmm(update.off_end) if update.off_end else None
+        if update.dim_brightness is not None and not (0 <= update.dim_brightness <= 255):
+            raise ValueError(f"dim_brightness must be 0-255: {update.dim_brightness!r}")
+
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE devices SET
+                    commute_start = ?, commute_end = ?,
+                    dim_start = ?, dim_end = ?, dim_brightness = ?,
+                    off_start = ?, off_end = ?
+                WHERE id = ?
+                """,
+                (
+                    commute_start, commute_end,
+                    dim_start, dim_end, update.dim_brightness,
+                    off_start, off_end,
+                    device_id,
+                ),
+            )
+        return self.get_device(device_id)
 
     # -- configurations --------------------------------------------------
 

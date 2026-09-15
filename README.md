@@ -10,6 +10,20 @@ The last request timestamp is stored with the device row.
 
 It also references one or more configurations.
 
+### Display schedule
+
+A device also carries an optional, device-wide display schedule: a commute-mode
+window, a dim window (with a brightness level), and an off window, each expressed
+as a `"HH:MM"` (24-hour) start/end pair evaluated in America/New_York. Any window
+left unset (both bounds blank) is disabled. A window may wrap past midnight (e.g.
+off from `23:00` to `06:00`).
+
+This only matters for **self-luminous displays** — the waveshare-rgb-matrix LED
+firmware evaluates these windows locally (against its own NTP clock) to flip
+between the minutes-countdown and a fixed arrival time during commute mode, and to
+dim/blank the panel outside viewing hours. ePaper devices have no backlight to dim
+and never call `GET /api/schedule` at all.
+
 ### Configuration
 
 A configuration includes the following properties:
@@ -70,6 +84,29 @@ The device is responsible for formatting/presentation. To show the next `max_dep
 The device identifies itself with an `X-Device-ID` header in its request. The resulting list of departures is the union of matching departures for all the configurations.
 
 When a device polls the API, the last request timestamp in its row is updated.
+
+### `GET /api/schedule`
+
+Same `X-Device-ID` auth as `/api/departures`. Returns the device's raw display
+schedule config, verbatim — not a computed "is commute mode active right now"
+boolean, since the device already has an NTP-synced clock and can evaluate the
+(possibly overnight-wrapping) windows itself:
+
+```json
+{
+  "commute_start": "07:00",
+  "commute_end": "09:30",
+  "dim_start": "20:00",
+  "dim_end": "23:00",
+  "dim_brightness": 40,
+  "off_start": "23:00",
+  "off_end": "06:00"
+}
+```
+
+Any/all fields are `null` if that window is unset. Set via
+`PUT /api/devices/{device_id}/schedule` from the configure page (same shape, all
+fields optional).
 
 ## Running
 

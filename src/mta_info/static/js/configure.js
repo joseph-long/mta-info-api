@@ -218,6 +218,24 @@ function setStatus(text, kind) {
   saveStatus.className = `status-text ${kind || ''}`;
 }
 
+const scheduleStatus = document.getElementById('schedule-status');
+
+function setScheduleStatus(text, kind) {
+  scheduleStatus.textContent = text;
+  scheduleStatus.className = `status-text ${kind || ''}`;
+}
+
+function fillSchedule(device) {
+  document.getElementById('commute-start').value = device.commute_start || '';
+  document.getElementById('commute-end').value = device.commute_end || '';
+  document.getElementById('dim-start').value = device.dim_start || '';
+  document.getElementById('dim-end').value = device.dim_end || '';
+  document.getElementById('dim-brightness').value =
+    device.dim_brightness == null ? '' : String(device.dim_brightness);
+  document.getElementById('off-start').value = device.off_start || '';
+  document.getElementById('off-end').value = device.off_end || '';
+}
+
 async function load() {
   document.getElementById('device-id-label').textContent = deviceId;
   document.getElementById('dashboard-link').href =
@@ -246,6 +264,8 @@ async function load() {
 
   for (const config of device.configurations) addConfigRow(config);
   if (device.configurations.length === 0) addConfigRow(null);
+
+  fillSchedule(device);
 }
 
 document.getElementById('add-config').addEventListener('click', () => addConfigRow(null));
@@ -268,6 +288,31 @@ document.getElementById('save-config').addEventListener('click', async () => {
   } else {
     const detail = (await resp.json().catch(() => ({}))).detail;
     setStatus(detail || `Save failed (${resp.status}).`, 'error');
+  }
+});
+
+document.getElementById('save-schedule').addEventListener('click', async () => {
+  const val = (id) => document.getElementById(id).value.trim();
+  const brightnessRaw = val('dim-brightness');
+  const payload = {
+    commute_start: val('commute-start') || null,
+    commute_end: val('commute-end') || null,
+    dim_start: val('dim-start') || null,
+    dim_end: val('dim-end') || null,
+    dim_brightness: brightnessRaw === '' ? null : Number(brightnessRaw),
+    off_start: val('off-start') || null,
+    off_end: val('off-end') || null,
+  };
+  const resp = await fetch(`/api/devices/${encodeURIComponent(deviceId)}/schedule`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  if (resp.ok) {
+    setScheduleStatus('Saved.', 'ok');
+  } else {
+    const detail = (await resp.json().catch(() => ({}))).detail;
+    setScheduleStatus(detail || `Save failed (${resp.status}).`, 'error');
   }
 });
 

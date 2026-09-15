@@ -5,6 +5,8 @@ from mta_info.db import (
     Database,
     DeviceExistsError,
     DuplicateServiceError,
+    ScheduleUpdate,
+    validate_hhmm,
 )
 
 
@@ -117,3 +119,72 @@ def test_replace_configurations_can_empty_the_set(db):
     db.enroll_device("board-1")
     db.replace_configurations("board-1", [])
     assert db.get_configurations("board-1") == []
+
+
+@pytest.mark.parametrize("value", ["07:00", "00:00", "23:59", "09:30"])
+def test_validate_hhmm_accepts_valid_times(value):
+    assert validate_hhmm(value) == value
+
+
+@pytest.mark.parametrize("value", ["", "7:00", "24:00", "12:60", "noon", "07-00", " 07:00 x"])
+def test_validate_hhmm_rejects_invalid_times(value):
+    with pytest.raises(ValueError, match="invalid time"):
+        validate_hhmm(value)
+
+
+def test_update_schedule_round_trips(db):
+    db.enroll_device("board-1")
+    device = db.update_schedule(
+        "board-1",
+        ScheduleUpdate(
+            commute_start="07:00",
+            commute_end="09:30",
+            dim_start="20:00",
+            dim_end="23:00",
+            dim_brightness=40,
+            off_start="23:00",
+            off_end="06:00",
+        ),
+    )
+    assert device.commute_start == "07:00"
+    assert device.commute_end == "09:30"
+    assert device.dim_start == "20:00"
+    assert device.dim_end == "23:00"
+    assert device.dim_brightness == 40
+    assert device.off_start == "23:00"
+    assert device.off_end == "06:00"
+
+    reloaded = db.get_device("board-1")
+    assert reloaded.commute_start == "07:00"
+    assert reloaded.dim_brightness == 40
+
+
+def test_update_schedule_defaults_are_unset(db):
+    db.enroll_device("board-1")
+    device = db.update_schedule("board-1", ScheduleUpdate())
+    assert device.commute_start is None
+    assert device.dim_brightness is None
+    assert device.off_end is None
+
+
+def test_update_schedule_resaving_replaces_the_whole_set(db):
+    db.enroll_device("board-1")
+    db.update_schedule("board-1", ScheduleUpdate(commute_start="07:00", commute_end="09:00"))
+    device = db.update_schedule("board-1", ScheduleUpdate(dim_start="20:00", dim_end="23:00"))
+    # Re-saving with a different subset clears fields not included this time --
+    # same "save the whole thing" shape as replace_configurations.
+    assert device.commute_start is None
+    assert device.dim_start == "20:00"
+
+
+def test_update_schedule_rejects_invalid_time(db):
+    db.enroll_device("board-1")
+    with pytest.raises(ValueError, match="invalid time"):
+        db.update_schedule("board-1", ScheduleUpdate(commute_start="7am", commute_end="09:00"))
+
+
+@pytest.mark.parametrize("brightness", [-1, 256])
+def test_update_schedule_rejects_out_of_range_brightness(db, brightness):
+    db.enroll_device("board-1")
+    with pytest.raises(ValueError, match="dim_brightness"):
+        db.update_schedule("board-1", ScheduleUpdate(dim_brightness=brightness))

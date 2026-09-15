@@ -211,3 +211,87 @@ def test_get_device_includes_configurations(client):
     assert len(data["configurations"]) == 1
     assert data["configurations"][0]["service"] == "A"
     assert data["configurations"][0]["direction"] == "uptown"
+
+
+SCHEDULE = {
+    "commute_start": "07:00",
+    "commute_end": "09:30",
+    "dim_start": "20:00",
+    "dim_end": "23:00",
+    "dim_brightness": 40,
+    "off_start": "23:00",
+    "off_end": "06:00",
+}
+
+
+def test_put_schedule_round_trips_via_get_device(client):
+    enroll(client)
+    resp = client.put("/api/devices/board-1/schedule", json=SCHEDULE)
+    assert resp.status_code == 200
+    for key, value in SCHEDULE.items():
+        assert resp.json()[key] == value
+
+    device = client.get("/api/devices/board-1").json()
+    for key, value in SCHEDULE.items():
+        assert device[key] == value
+
+
+def test_put_schedule_rejects_unknown_device(client):
+    resp = client.put("/api/devices/nope/schedule", json=SCHEDULE)
+    assert resp.status_code == 404
+
+
+def test_put_schedule_rejects_bad_time(client):
+    enroll(client)
+    resp = client.put(
+        "/api/devices/board-1/schedule",
+        json={"commute_start": "not-a-time", "commute_end": "09:00"},
+    )
+    assert resp.status_code == 422
+
+
+def test_put_schedule_rejects_bad_brightness(client):
+    enroll(client)
+    resp = client.put("/api/devices/board-1/schedule", json={"dim_brightness": 300})
+    assert resp.status_code == 422
+
+
+def test_get_schedule_requires_device_header(client):
+    assert client.get("/api/schedule").status_code == 401
+
+
+def test_get_schedule_rejects_unknown_device(client):
+    resp = client.get("/api/schedule", headers={"X-Device-ID": "nope"})
+    assert resp.status_code == 404
+
+
+def test_get_schedule_returns_raw_config_not_computed_state(client):
+    enroll(client)
+    client.put("/api/devices/board-1/schedule", json=SCHEDULE)
+    resp = client.get("/api/schedule", headers={"X-Device-ID": "board-1"})
+    assert resp.status_code == 200
+    assert resp.json() == SCHEDULE
+    assert "commute_active" not in resp.json()
+    assert "brightness" not in resp.json()
+
+
+def test_get_schedule_defaults_to_all_null(client):
+    enroll(client)
+    resp = client.get("/api/schedule", headers={"X-Device-ID": "board-1"})
+    assert resp.json() == {
+        "commute_start": None,
+        "commute_end": None,
+        "dim_start": None,
+        "dim_end": None,
+        "dim_brightness": None,
+        "off_start": None,
+        "off_end": None,
+    }
+
+
+def test_departures_response_shape_unchanged_by_schedule_feature(client):
+    # /api/departures must stay a bare array -- the schedule feature lives
+    # entirely on its own endpoints, not folded into this response.
+    enroll(client)
+    resp = client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    assert isinstance(resp.json(), list)

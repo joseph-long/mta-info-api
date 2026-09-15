@@ -34,6 +34,51 @@
         <button id="save-config" type="button">Save configurations</button>
         <span id="save-status" class="status-text"></span>
       </div>
+
+      <h2>Display schedule</h2>
+      <p class="muted">
+        Device-wide, not per-configuration. Only self-luminous displays (e.g. the
+        waveshare-rgb-matrix LED firmware) act on this &mdash; ePaper devices never
+        call this endpoint. Leave a window's fields blank to disable it.
+      </p>
+      <div class="field-row">
+        <div class="field">
+          <label>Commute mode start</label>
+          <input type="time" id="commute-start" />
+        </div>
+        <div class="field">
+          <label>Commute mode end</label>
+          <input type="time" id="commute-end" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Dim start</label>
+          <input type="time" id="dim-start" />
+        </div>
+        <div class="field">
+          <label>Dim end</label>
+          <input type="time" id="dim-end" />
+        </div>
+        <div class="field">
+          <label>Dim brightness (0-255)</label>
+          <input type="number" id="dim-brightness" min="0" max="255" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>Off start</label>
+          <input type="time" id="off-start" />
+        </div>
+        <div class="field">
+          <label>Off end</label>
+          <input type="time" id="off-end" />
+        </div>
+      </div>
+      <div class="actions-row">
+        <button id="save-schedule" type="button">Save schedule</button>
+        <span id="schedule-status" class="status-text"></span>
+      </div>
     </div>
     <script type="module" src="/static/js/configure.js"></script>
   </body>
