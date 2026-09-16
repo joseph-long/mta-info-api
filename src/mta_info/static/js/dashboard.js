@@ -1,7 +1,7 @@
 // Dashboard preview: polls the same device API an embedded client would
-// (X-Device-ID header, max_departures query param) and renders the result
-// in a format inspired by MTA departures boards. All formatting happens
-// here, client-side -- the API only carries data.
+// (/public/devices/{id}/departures, max_departures query param) and renders
+// the result in a format inspired by MTA departures boards. All formatting
+// happens here, client-side -- the API only carries data.
 
 const deviceId = decodeURIComponent(window.location.pathname.split('/')[2]);
 const params = new URLSearchParams(window.location.search);
@@ -122,9 +122,9 @@ function render() {
 
 async function poll() {
   try {
-    const resp = await fetch(`/api/departures?max_departures=${maxDepartures}`, {
-      headers: { 'X-Device-ID': deviceId },
-    });
+    const resp = await fetch(
+      `/public/devices/${encodeURIComponent(deviceId)}/departures?max_departures=${maxDepartures}`
+    );
     if (resp.ok) {
       departures = await resp.json();
       errorMessage = null;

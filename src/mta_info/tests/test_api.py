@@ -82,18 +82,14 @@ def configure(client, configurations, device_id="board-1"):
     )
 
 
-def test_departures_requires_device_header(client):
-    assert client.get("/api/departures").status_code == 401
-
-
 def test_departures_rejects_unknown_device(client):
-    resp = client.get("/api/departures", headers={"X-Device-ID": "nope"})
+    resp = client.get("/public/devices/nope/departures")
     assert resp.status_code == 404
 
 
 def test_enrolled_device_with_blank_config_gets_empty_list(client):
     enroll(client)
-    resp = client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/departures")
     assert resp.status_code == 200
     assert resp.json() == []
 
@@ -101,7 +97,7 @@ def test_enrolled_device_with_blank_config_gets_empty_list(client):
 def test_polling_updates_last_request_timestamp(client):
     enroll(client)
     assert client.get("/api/devices/board-1").json()["last_request_at"] is None
-    client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    client.get("/public/devices/board-1/departures")
     assert client.get("/api/devices/board-1").json()["last_request_at"] is not None
 
 
@@ -121,7 +117,7 @@ def test_departures_payload_shape(client):
     )
     assert resp.status_code == 200
 
-    resp = client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/departures")
     departures = resp.json()
     assert len(departures) == 2
 
@@ -144,7 +140,7 @@ def test_direction_is_applied(client):
     enroll(client)
     # Both A trips in the fixture feed stop at the uptown platform (101N).
     configure(client, [{"origin_station_id": "101", "service": "A", "direction": "downtown"}])
-    resp = client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/departures")
     assert resp.json() == []
 
 
@@ -158,7 +154,7 @@ def test_destination_keys_omitted_when_no_destination_configured(client):
     enroll(client)
     configure(client, [{"origin_station_id": "101", "service": "A", "direction": "uptown"}])
     [departure] = client.get(
-        "/api/departures?max_departures=1", headers={"X-Device-ID": "board-1"}
+        "/public/devices/board-1/departures?max_departures=1"
     ).json()
     assert "stops_at_destination" not in departure
     assert "reach_destination_at" not in departure
@@ -173,14 +169,12 @@ def test_departures_unions_configurations_and_caps_at_max(client):
             {"origin_station_id": "101", "service": "C", "direction": "downtown"},
         ],
     )
-    resp = client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/departures")
     departures = resp.json()
     # 3 departures total, default cap is 3: C(+2), A(+5), A(+12).
     assert [d["service"] for d in departures] == ["C", "A", "A"]
 
-    resp = client.get(
-        "/api/departures?max_departures=2", headers={"X-Device-ID": "board-1"}
-    )
+    resp = client.get("/public/devices/board-1/departures?max_departures=2")
     assert [d["service"] for d in resp.json()] == ["C", "A"]
 
 
@@ -211,6 +205,26 @@ def test_get_device_includes_configurations(client):
     assert len(data["configurations"]) == 1
     assert data["configurations"][0]["service"] == "A"
     assert data["configurations"][0]["direction"] == "uptown"
+
+
+def test_delete_device_removes_it(client):
+    enroll(client)
+    resp = client.delete("/api/devices/board-1")
+    assert resp.status_code == 204
+    assert client.get("/api/devices/board-1").status_code == 404
+    assert client.get("/api/devices").json() == []
+
+
+def test_delete_device_rejects_unknown_device(client):
+    resp = client.delete("/api/devices/nope")
+    assert resp.status_code == 404
+
+
+def test_delete_device_is_idempotent_failure(client):
+    enroll(client)
+    client.delete("/api/devices/board-1")
+    resp = client.delete("/api/devices/board-1")
+    assert resp.status_code == 404
 
 
 SCHEDULE = {
@@ -256,19 +270,15 @@ def test_put_schedule_rejects_bad_brightness(client):
     assert resp.status_code == 422
 
 
-def test_get_schedule_requires_device_header(client):
-    assert client.get("/api/schedule").status_code == 401
-
-
 def test_get_schedule_rejects_unknown_device(client):
-    resp = client.get("/api/schedule", headers={"X-Device-ID": "nope"})
+    resp = client.get("/public/devices/nope/schedule")
     assert resp.status_code == 404
 
 
 def test_get_schedule_returns_raw_config_not_computed_state(client):
     enroll(client)
     client.put("/api/devices/board-1/schedule", json=SCHEDULE)
-    resp = client.get("/api/schedule", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/schedule")
     assert resp.status_code == 200
     assert resp.json() == SCHEDULE
     assert "commute_active" not in resp.json()
@@ -277,7 +287,7 @@ def test_get_schedule_returns_raw_config_not_computed_state(client):
 
 def test_get_schedule_defaults_to_all_null(client):
     enroll(client)
-    resp = client.get("/api/schedule", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/schedule")
     assert resp.json() == {
         "commute_start": None,
         "commute_end": None,
@@ -290,8 +300,8 @@ def test_get_schedule_defaults_to_all_null(client):
 
 
 def test_departures_response_shape_unchanged_by_schedule_feature(client):
-    # /api/departures must stay a bare array -- the schedule feature lives
-    # entirely on its own endpoints, not folded into this response.
+    # /public/devices/{id}/departures must stay a bare array -- the schedule
+    # feature lives entirely on its own endpoints, not folded into this response.
     enroll(client)
-    resp = client.get("/api/departures", headers={"X-Device-ID": "board-1"})
+    resp = client.get("/public/devices/board-1/departures")
     assert isinstance(resp.json(), list)

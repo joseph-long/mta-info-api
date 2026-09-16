@@ -46,6 +46,30 @@ def test_touch_device_sets_last_request(db):
     assert db.get_device("board-1").last_request_at is not None
 
 
+def test_delete_device_removes_it_and_its_configurations(db):
+    db.enroll_device("board-1")
+    db.replace_configurations(
+        "board-1",
+        [ConfigurationUpdate(origin_station_id="101", service="A", direction="uptown")],
+    )
+    assert db.delete_device("board-1") is True
+    assert db.get_device("board-1") is None
+    with db._connect() as conn:
+        count = conn.execute("SELECT COUNT(*) AS n FROM configurations").fetchone()["n"]
+    assert count == 0
+
+
+def test_delete_device_returns_false_for_unknown_device(db):
+    assert db.delete_device("nope") is False
+
+
+def test_delete_device_leaves_other_devices_alone(db):
+    db.enroll_device("board-1")
+    db.enroll_device("board-2")
+    db.delete_device("board-1")
+    assert [d.id for d in db.list_devices()] == ["board-2"]
+
+
 def test_replace_configurations_round_trips_and_normalizes(db):
     db.enroll_device("board-1")
     saved = db.replace_configurations(

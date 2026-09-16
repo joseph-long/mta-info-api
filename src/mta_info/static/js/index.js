@@ -34,7 +34,29 @@ function deviceRow(device) {
   dashboardCell.appendChild(dashboardLink);
   tr.appendChild(dashboardCell);
 
+  const deleteCell = document.createElement('td');
+  const deleteButton = document.createElement('button');
+  deleteButton.type = 'button';
+  deleteButton.className = 'secondary';
+  deleteButton.textContent = 'Delete';
+  deleteButton.addEventListener('click', () => deleteDevice(device.id, tr));
+  deleteCell.appendChild(deleteButton);
+  tr.appendChild(deleteCell);
+
   return tr;
+}
+
+async function deleteDevice(id, row) {
+  if (!window.confirm(`Delete device "${id}"? This also removes its configurations and schedule.`)) {
+    return;
+  }
+  const resp = await fetch(`/api/devices/${encodeURIComponent(id)}`, { method: 'DELETE' });
+  if (resp.ok) {
+    row.remove();
+    noDevices.hidden = tbody.children.length > 0;
+  } else {
+    window.alert(`Delete failed (${resp.status}).`);
+  }
 }
 
 async function loadDevices() {

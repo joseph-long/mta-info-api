@@ -22,7 +22,7 @@ This only matters for **self-luminous displays** — the waveshare-rgb-matrix LE
 firmware evaluates these windows locally (against its own NTP clock) to flip
 between the minutes-countdown and a fixed arrival time during commute mode, and to
 dim/blank the panel outside viewing hours. ePaper devices have no backlight to dim
-and never call `GET /api/schedule` at all.
+and never call `GET /public/devices/{device_id}/schedule` at all.
 
 ### Configuration
 
@@ -39,7 +39,7 @@ The web UI is only accessible on LAN and VPN and no user authentication / multi-
 
 ### List devices
 
-A list of devices linking to the configuration page for each, the 'view dashboard' preview for each, and a button to enroll a new device.
+A list of devices linking to the configuration page for each, the 'view dashboard' preview for each, a 'Delete' button for each, and a button to enroll a new device.
 
 ### Enroll new device
 
@@ -48,6 +48,12 @@ User takes identifier reported by device and enters into a web form.
 New row is stored for this device.
 
 A default configuration row is populated and pointed at the device identifier.
+
+### Delete device
+
+Removes the device row and its configurations (`DELETE /api/devices/{device_id}`).
+Confirmed client-side before the request is sent; irreversible once it lands, since
+a deleted device's id can simply be re-enrolled with none of its history.
 
 ### Configure device
 
@@ -62,6 +68,14 @@ Include a link to preview the dashboard in-browser.
 For a given device, show the next `max_departures` (query parameter, default = 3) departures in a format (two rows, index, service, terminus, minutes-to-arrive) inspired by MTA departures boards. Update with polling, as embedded clients would. With `debug=1`, additionally pretty-print the raw JSON the API returned below the board.
 
 ## API
+
+Every route a device calls unauthenticated over the open internet lives under
+`/public/devices/{device_id}/...` — the device id is a path segment, not a
+header. This lets the reverse proxy in front of the app allow-list the whole
+`/public/` prefix once; a new device-facing route never needs an infra change
+to become reachable (see the `mta-info-api.nix` module in the infra repo).
+Everything else (enrollment, configure pages, the dashboard preview, and
+their backing APIs) is restricted to LAN/VPN by that same proxy.
 
 The device is responsible for formatting/presentation. To show the next `max_departures` (query parameter, default = 3) departures, it needs the following information for each:
 
@@ -81,16 +95,18 @@ The device is responsible for formatting/presentation. To show the next `max_dep
  - `stops_at_destination` - boolean, optional - when a destination station is configured, this key is present and indicates whether the scheduled train is making its usual stop at that station (only trains heading in the configured direction are ever listed, so `false` really means the train skips the destination)
  - `reach_destination_at` - ISO 8601 timestamp string, optional - when a destination station is configured and `stops_at_destination` is `true`, this is the time to arrive at the destination (including any walk time after reaching the station)
 
-The device identifies itself with an `X-Device-ID` header in its request. The resulting list of departures is the union of matching departures for all the configurations.
+This is `GET /public/devices/{device_id}/departures`; the device identifies itself
+with its id in the URL, not a header. The resulting list of departures is the
+union of matching departures for all the configurations.
 
 When a device polls the API, the last request timestamp in its row is updated.
 
-### `GET /api/schedule`
+### `GET /public/devices/{device_id}/schedule`
 
-Same `X-Device-ID` auth as `/api/departures`. Returns the device's raw display
-schedule config, verbatim — not a computed "is commute mode active right now"
-boolean, since the device already has an NTP-synced clock and can evaluate the
-(possibly overnight-wrapping) windows itself:
+Same no-auth-beyond-the-path-id shape as departures. Returns the device's raw
+display schedule config, verbatim — not a computed "is commute mode active
+right now" boolean, since the device already has an NTP-synced clock and can
+evaluate the (possibly overnight-wrapping) windows itself:
 
 ```json
 {
@@ -121,7 +137,7 @@ background so the configure page has stations to pick from.
 
 The web UI is at `/`: enroll a device, configure it at `/devices/<id>/configure`,
 and preview its board at `/devices/<id>/dashboard`. Devices poll
-`GET /api/departures?max_departures=N` with their `X-Device-ID` header.
+`GET /public/devices/<id>/departures?max_departures=N`.
 
 ## Development
 

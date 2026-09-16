@@ -25,6 +25,32 @@ def test_enroll_device_via_form_lands_on_configure_page(page, live_server):
     expect(row.get_by_role("link", name="View dashboard")).to_be_visible()
 
 
+def test_delete_device_removes_it_from_list(page, live_server):
+    enroll_device(live_server, "board-e2e")
+
+    page.goto(live_server)
+    row = page.locator("table.devices tbody tr")
+    expect(row).to_have_count(1)
+
+    page.once("dialog", lambda dialog: dialog.accept())
+    row.get_by_role("button", name="Delete").click()
+
+    expect(page.locator("table.devices tbody tr")).to_have_count(0)
+    expect(page.locator("#no-devices")).to_be_visible()
+
+
+def test_delete_device_dismissed_keeps_it(page, live_server):
+    enroll_device(live_server, "board-e2e")
+
+    page.goto(live_server)
+    row = page.locator("table.devices tbody tr")
+
+    page.once("dialog", lambda dialog: dialog.dismiss())
+    row.get_by_role("button", name="Delete").click()
+
+    expect(page.locator("table.devices tbody tr")).to_have_count(1)
+
+
 def test_enroll_duplicate_device_shows_error(page, live_server):
     enroll_device(live_server, "board-e2e")
 

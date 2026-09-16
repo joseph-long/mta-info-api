@@ -137,6 +137,12 @@ def create_app(feed_cache: FeedCache | None = None) -> FastAPI:
             ],
         }
 
+    @app.delete("/api/devices/{device_id}", status_code=204)
+    async def delete_device(request: Request, device_id: str):
+        db: Database = request.app.state.db
+        if not db.delete_device(device_id):
+            raise HTTPException(404, f"unknown device: {device_id}")
+
     @app.put("/api/devices/{device_id}/configurations")
     async def put_configurations(
         request: Request, device_id: str, payload: ConfigurationsPayload
@@ -190,15 +196,17 @@ def create_app(feed_cache: FeedCache | None = None) -> FastAPI:
             "station_count": len(new_index.stations),
         }
 
-    # -- the device-facing API ---------------------------------------------
+    # -- the device-facing API ----------------------------------------------
+    # Every route a device calls unauthenticated over the open internet lives
+    # under /public/devices/{device_id}/... -- the device id is a path
+    # segment, not a header, so the reverse proxy in front of this app can
+    # allow-list the whole /public/ prefix once and never need to change again
+    # when a new device-facing route is added (see infra's mta-info-api.nix).
 
-    @app.get("/api/departures")
-    async def api_departures(
-        request: Request, max_departures: int = Query(default=3, ge=1)
+    @app.get("/public/devices/{device_id}/departures")
+    async def public_departures(
+        request: Request, device_id: str, max_departures: int = Query(default=3, ge=1)
     ):
-        device_id = request.headers.get("X-Device-ID", "").strip()
-        if not device_id:
-            raise HTTPException(401, "missing X-Device-ID header")
         db: Database = request.app.state.db
         if db.get_device(device_id) is None:
             raise HTTPException(404, f"unknown device: {device_id}")
@@ -211,11 +219,8 @@ def create_app(feed_cache: FeedCache | None = None) -> FastAPI:
         by_config = [compute_departures(messages, c, index) for c in configs]
         return [d.to_dict() for d in merge_departures(by_config, max_departures)]
 
-    @app.get("/api/schedule")
-    async def api_schedule(request: Request):
-        device_id = request.headers.get("X-Device-ID", "").strip()
-        if not device_id:
-            raise HTTPException(401, "missing X-Device-ID header")
+    @app.get("/public/devices/{device_id}/schedule")
+    async def public_schedule(request: Request, device_id: str):
         db: Database = request.app.state.db
         device = db.get_device(device_id)
         if device is None:

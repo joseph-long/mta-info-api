@@ -200,6 +200,19 @@ class Database:
                 (_now_iso(), device_id),
             )
 
+    def delete_device(self, device_id: str) -> bool:
+        """Remove a device and its join-table rows (ON DELETE CASCADE).
+        Configurations left with no device linked to them are garbage, same
+        cleanup as replace_configurations. Returns False if the device
+        didn't exist."""
+        with self._connect() as conn:
+            cursor = conn.execute("DELETE FROM devices WHERE id = ?", (device_id,))
+            conn.execute(
+                "DELETE FROM configurations WHERE id NOT IN"
+                " (SELECT configuration_id FROM device_configurations)"
+            )
+            return cursor.rowcount > 0
+
     def update_schedule(self, device_id: str, update: ScheduleUpdate) -> Device:
         """Validate and save a device's whole display schedule (commute/dim/off
         windows are replaced wholesale, same save-the-whole-thing shape as
