@@ -37,6 +37,22 @@ def _iso_z(dt: datetime) -> str:
     return dt.isoformat().replace("+00:00", "Z")
 
 
+# Curated overrides for terminus names the raw GTFS stop name renders as too
+# long/confusing on a small display. Keyed by the resolved GTFS name (not the
+# stop id), so an override applies regardless of which platform/complex it
+# came from. Add more here as they come up -- this only affects the terminus
+# field of the departures API, not station names shown elsewhere (e.g. the
+# configure page's station picker).
+TERMINUS_NAME_OVERRIDES: dict[str, str] = {
+    "Coney Island-Stillwell Av": "Coney Island",
+}
+
+
+def _terminus_name(gtfs_index: GtfsIndex, stop_id: str) -> str:
+    name = gtfs_index.resolve_stop_name(stop_id)
+    return TERMINUS_NAME_OVERRIDES.get(name, name)
+
+
 def _stop_ids_for(station: Station) -> set[str]:
     # Bare parent id included too: terminals/shuttles with no N/S-suffixed
     # platform report real-time updates against the parent stop id itself.
@@ -108,7 +124,7 @@ def compute_departures(
                 if arrival_dt < now:
                     continue
 
-                terminus = gtfs_index.resolve_stop_name(stop_time_updates[-1].stop_id)
+                terminus = _terminus_name(gtfs_index, stop_time_updates[-1].stop_id)
 
                 stops_at_destination = None
                 reach_destination_at = None

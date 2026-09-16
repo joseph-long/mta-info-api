@@ -81,6 +81,18 @@ def test_matches_service_and_resolves_terminus():
     assert rows[0].arrives_at == datetime.fromtimestamp(NOW_EPOCH + 5 * 60, tz=timezone.utc)
 
 
+def test_terminus_name_override_applied():
+    index = build_index()
+    # "201"/"201N" resolve to "Far Away Ave" in the shared fixture; override
+    # its resolved name in place to exercise the terminus override lookup
+    # without needing a whole separate GtfsIndex fixture.
+    index.stop_names["201"] = "Coney Island-Stillwell Av"
+    index.stop_names["201N"] = "Coney Island-Stillwell Av"
+    feed = feed_message([("A", [("101N", NOW_EPOCH + 5 * 60), ("201N", NOW_EPOCH + 25 * 60)])])
+    rows = compute_departures({"gtfs-ace": feed}, make_config(), index, now=NOW)
+    assert rows[0].terminus == "Coney Island"
+
+
 def test_direction_filters_by_platform_suffix():
     index = build_index()
     feed = feed_message(
